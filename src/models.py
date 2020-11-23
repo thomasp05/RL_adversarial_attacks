@@ -17,7 +17,6 @@ class Actor(nn.Module):
     def forward(self, state): 
         '''
         state: 
-        action: 
         '''
         x = state # concatenate because the input is both 
         x = F.relu(self.linear1(x)) 
@@ -29,7 +28,7 @@ class Actor(nn.Module):
 
 class Critic(nn.Module): 
     def __init__(self, input_size, hidden_size, output_size): 
-        super(Actor, self).__init__()
+        super(Critic, self).__init__()
         self.linear1 = nn.Linear(input_size, hidden_size) 
         self.linear2 = nn.Linear(hidden_size, output_size) 
 
@@ -38,7 +37,7 @@ class Critic(nn.Module):
         state: 
         action: 
         '''
-        x = torch.cat([state, action], 1) # concatenate because the input is both 
+        x = torch.cat([state, action], 0) # concatenate because the input is both 
         x = F.relu(self.linear1(x)) 
         x = F.relu(self.linear2(x)) 
 
@@ -75,6 +74,19 @@ class Lenet5(nn.Module):
         y = self.output(y)
 
         return y
+
+    def featureMap(self, x): 
+        y = self.C1(x)
+        y = F.relu(y)
+        y = self.S2(y)
+
+        y = self.C3(y)
+        y = F.relu(y)
+        y = self.S4(y)
+     
+        y = y.view(-1, 16*4*4)  
+        return y
+
 
     def evaluate(self, valloader, device): 
         correct_count = 0 
