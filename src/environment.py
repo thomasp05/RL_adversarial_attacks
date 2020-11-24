@@ -31,20 +31,25 @@ class environment:
 
         # get the random image and compute its predicted class with the neural network 
         self.img, self.label = self.imgset.__getitem__(index) 
+
+        # move img to device 
+        self.img = self.img.to(self.device)
+        
         prediction = -1
         while(prediction != self.label):
             with torch.no_grad(): 
-                self.prediction = self.model.forward(self.img.unsqueeze(0).to(self.device)).squeeze()
+                self.prediction = self.model(self.img.view(1, 1, 28, 28)).squeeze() 
             prediction = torch.argmax(self.prediction)
         
         # compute the feature map 
         with torch.no_grad(): 
-            self.feature_map = self.model.featureMap(self.img.to(self.device).unsqueeze(0)).squeeze()
+            self.feature_map = self.model.featureMap(self.img.view(1, 1, 28, 28)).squeeze() 
 
         # create the one-hot encoded vector for the label 
-        one_hot = np.zeros(self.prediction.shape)
+        # one_hot = np.zeros(self.prediction.shape)
+        one_hot = torch.zeros(self.prediction.shape, device=self.device)
         one_hot[self.label] = 1
-        one_hot = torch.tensor(one_hot)  
+        one_hot = torch.tensor(one_hot).to(self.device)  
         self.one_hot = one_hot
 
         # format the context 
@@ -63,7 +68,7 @@ class environment:
         # print(action_.shape) 
 
         new_image = action.view(-1, 28, 28)
-        new_image = new_image + self.img.to(self.device)    # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
+        new_image = new_image + self.img   # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
         action_ = new_image.unsqueeze(0)
 
         # display the image 
