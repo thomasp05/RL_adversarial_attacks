@@ -2,6 +2,7 @@
 # 
 import numpy as np 
 import torch 
+from matplotlib import pyplot as plt
 
 class environment: 
     def __init__(self, model, imgset, device, seed=None): 
@@ -33,7 +34,7 @@ class environment:
         prediction = -1
         while(prediction != self.label):
             with torch.no_grad(): 
-                self.prediction = self.model.forward(self.img.unsqueeze(0).to(self.device)).to("cpu").squeeze()
+                self.prediction = self.model.forward(self.img.unsqueeze(0).to(self.device)).squeeze()
             prediction = torch.argmax(self.prediction)
         
         # compute the feature map 
@@ -59,20 +60,34 @@ class environment:
         # compute the predicted class for the given action with the neural network
         # reformat the action into [1, 1, 28, 29] 
         action_ = action.view(-1, 28, 28).unsqueeze(0) 
+        # print(action_.shape) 
+
+        new_image = action.view(-1, 28, 28)
+        new_image = new_image + self.img.to(self.device)    # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
+        action_ = new_image.unsqueeze(0)
+
+        # display the image 
+        # np_img = new_image.to("cpu").detach().view(28, 28)
+        # plt.imshow(np_img,  cmap="gray")
+        # plt.show()
+
+        # compute the new predictions and convolutional features map
         with torch.no_grad(): 
-            new_prediction = self.model.forward(action_).squeeze() 
-            new_feature_map = self.model.featureMap(action_).squeeze()
+            self.prediction = self.model.forward(action_).squeeze() 
+            self.feature_map = self.model.featureMap(action_).squeeze()
 
-        self.feature_map = new_feature_map
-        self.prediction = new_prediction
+        next_state = torch.cat((self.feature_map.type(torch.DoubleTensor), self.prediction.type(torch.DoubleTensor), self.one_hot.type(torch.DoubleTensor)), 0).type(torch.FloatTensor)
 
-        next_state = torch.cat((self.feature_map.type(torch.DoubleTensor), self.prediction.type(torch.DoubleTensor), self.one_hot.type(torch.DoubleTensor)), 0)
+        #check if image is misclassified and compute reward 
+        episode_done = False
+        reward = 0 
 
-        # compute reward 
-        reward = 1
-        
-        #check if image is misclassified 
-        episode_done = False 
+        # print(self.prediction)
+        # print(torch.argmax(self.prediction))
+        # print(self.label)
+        if(torch.argmax(self.prediction) != self.label): 
+            episode_done = True 
+            reward = 1
 
         return next_state, reward, episode_done
 
