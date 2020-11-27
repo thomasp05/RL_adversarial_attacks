@@ -61,56 +61,27 @@ class environment:
         state = torch.cat((self.feature_map.type(torch.DoubleTensor), self.prediction.type(torch.DoubleTensor), one_hot.type(torch.DoubleTensor)), 0)
         self.current_state = state.type(torch.FloatTensor)
 
-
-        # counter for episode done 
-        self.counter = 0 
-
         return self.current_state
         
 
-    def step(self, action): 
+    def step(self, action, epsilon, t): 
         """
         action:  vector containing image perturbations 
         """
-        # compute the predicted class for the given action with the neural network
-        # reformat the action into [1, 1, 28, 29] 
-        # action_ = action.view(-1, 28, 28).unsqueeze(0) 
-
-        # normalize action between -1 and 1 like original image under attack
-        # action_ = (action_ - action_.min()) /(action_.max() - action_.min()) * (-2) + 1
-
         new_image = action.view(-1, 28, 28)
-        new_image = new_image * 1  + self.img  # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
+        new_image = new_image  + self.img  # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
         
         # add noise to perturbation
       
-        noise = 0.01 *  torch.rand(self.img.shape)
-        new_image = new_image + noise.to(self.device) 
+        noise = torch.rand(self.img.shape) * epsilon
+        # new_image = new_image + noise.to(self.device) 
         action_ = new_image + noise.to(self.device)
-        action_ = torch.clamp(action_, 0, 1)
+        action_ = (action_ - action_.min()) / (action_.max() - action_.min()) 
 
-        
-        action_ = action_.unsqueeze(0)
-
-        # print(" ")
-        # print(action_.max()) 
-        # print(action_.min())
-        # print(self.original_image.max()) 
-        # print(self.original_image.min())
-        # print(" ")
-        # # display the image 
-        # np_img = new_image.to("cpu").detach().view(28, 28)
-        # img2 = action_.squeeze(0).to("cpu").detach().view(28, 28)
-        # plt.subplot(1,2,1)
-        # plt.imshow(np_img,  cmap="gray")
-        # plt.subplot(2,2,2)
-        # plt.imshow(img2,  cmap="gray")
-        # plt.show()
-
-        # # compute the new predictions and convolutional features map
+        # compute the new predictions and convolutional features map
         with torch.no_grad(): 
-            new_prediction = self.model.forward(action_).squeeze() 
-            new_feature_map = self.model.featureMap(action_).squeeze()
+            new_prediction = self.model.forward(action_.unsqueeze(0)).squeeze() 
+            new_feature_map = self.model.featureMap(action_.unsqueeze(0)).squeeze()
 
         next_state = torch.cat((new_feature_map.type(torch.DoubleTensor), new_prediction.type(torch.DoubleTensor), self.one_hot.type(torch.DoubleTensor)), 0).type(torch.FloatTensor)
 
@@ -120,8 +91,7 @@ class environment:
         ######################
         ### calcul du reward # 
         ######################
-        temp = self.prediction[self.label].to("cpu").numpy()
-        temp2 = new_prediction[self.label].to("cpu").numpy()
+
 
         # pour predicions des autres classes 
         pred_reward = 0
@@ -132,44 +102,39 @@ class environment:
                 temp3 = new - old 
                 pred_reward += temp3
 
+        # difference pour la classe originale de l'image
+        temp = self.prediction[self.label].to("cpu").numpy()
+        temp2 = new_prediction[self.label].to("cpu").numpy()
+
         # difference btw feature map and new feature map
         feature_reward = self.feature_map - new_feature_map
         feature_reward = feature_reward.to("cpu").numpy().sum()
 
         # difference btw image and new image 
-        img_reward = self.original_image.squeeze() - new_image.squeeze()
+        img_reward = self.original_image.squeeze() - action_.squeeze()
         img_reward = img_reward.to("cpu").numpy().sum()
 
         # compute total reward 
-        reward =  np.abs(temp - temp2) - 0.4 * np.abs(img_reward) +  pred_reward
+        # reward =  np.abs(temp - temp2) - 0.4 * np.abs(img_reward) #+  pred_reward
+        reward = - 1 * np.abs(img_reward) 
+
      
         
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label): 
                
-            self.counter += 1
-            if(self.counter >= 1): 
-                episode_done = True 
-                reward = reward + 100 
+            episode_done = True 
+            reward = reward + 100 
 
             print("real class:", self.label) 
             print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             print("prediction vector:", new_prediction.to("cpu").numpy())
-                
-            # # display the image 
-            # np_img = new_image.to("cpu").detach().view(28, 28)
-            # np_img1 = self.original_image.to("cpu").detach().view(28,28)
-            # plt.subplot(1,2,1)
-            # plt.imshow(np_img,  cmap="Greys")
-            # plt.subplot(2,2,2)
-            # plt.imshow(np_img1,  cmap="Greys")
-            # plt.show()
 
             
         # update prediction and feature map before exiting
         self.prediction = new_prediction
         self.feature_map = new_feature_map 
-        self.img = action_ .squeeze(0)
+        self.img = action_ 
 
         return next_state, reward, episode_done
 

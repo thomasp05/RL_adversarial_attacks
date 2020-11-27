@@ -93,6 +93,7 @@ critic_optim = optim.Adam(critic.parameters(), lr_critic)
 #### main loop ####
 cumul_reward = [] 
 cumul_loss = [] 
+epsilon = 1
 
 for episode in range(100): 
     # TODO: implement noise process
@@ -104,13 +105,13 @@ for episode in range(100):
     max_iter = 0
 
     
-    while not episode_done and max_iter < 50: 
+    while not episode_done and max_iter < 100: 
         # compute the action to take with the actor network, which approximates the Q-function
         # with torch.no_grad():
         action = actor.forward(state.to(device))    # TODO: add noise 
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
-        new_state, r, episode_done = env.step(action.detach()) 
+        new_state, r, episode_done = env.step(action.detach(), epsilon, nb_iteration) 
         reward.append(r)
 
         # save observations in the replay buffer 
@@ -120,64 +121,65 @@ for episode in range(100):
         # check if enough samples stored in replay buffer 
         if(replay_buffer.buffer_len > batch_size): 
 
-            if(nb_iteration % 4 ==0):
+            # if(nb_iteration % 4 == 0):
           
-                # randomly sample a minibatch from the replay buffer 
-                minibatch = replay_buffer.get_batch(batch_size) 
-                # print(minibatch)
+            # randomly sample a minibatch from the replay buffer 
+            minibatch = replay_buffer.get_batch(batch_size) 
+            # print(minibatch)
 
-                # Unpack minibatch 
-                states_batch = np.array([x[0].numpy() for x in minibatch]) 
-                actions_batch = np.array([x[1].numpy() for x in minibatch]) 
-                rewards_batch = np.array([x[2] for x in minibatch]) 
-                next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
-                terminal = np.array([x[4] for x in minibatch]) 
-                
-                states_batch = torch.FloatTensor(states_batch)
-                actions_batch = torch.FloatTensor(actions_batch)
-                next_states_batch = torch.FloatTensor(next_states_batch)
-                rewards_batch = torch.FloatTensor(rewards_batch) 
-                terminal = torch.FloatTensor(terminal)
+            # Unpack minibatch 
+            states_batch = np.array([x[0].numpy() for x in minibatch]) 
+            actions_batch = np.array([x[1].numpy() for x in minibatch]) 
+            rewards_batch = np.array([x[2] for x in minibatch]) 
+            next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
+            terminal = np.array([x[4] for x in minibatch]) 
+            
+            states_batch = torch.FloatTensor(states_batch)
+            actions_batch = torch.FloatTensor(actions_batch)
+            next_states_batch = torch.FloatTensor(next_states_batch)
+            rewards_batch = torch.FloatTensor(rewards_batch) 
+            terminal = torch.FloatTensor(terminal)
 
-                # compute predicted q values           
-                q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
+            # compute predicted q values           
+            q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
 
-                # 1- compute next actions with actor target network 
-                next_actions = actor_target(next_states_batch.to(device))
+            # 1- compute next actions with actor target network 
+            next_actions = actor_target(next_states_batch.to(device))
 
-                # compute target q values with the Bellman equation
-                # rewards_batch doesnt have the right dimensions 
-                y_i =  rewards_batch + gamma * critic_target(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
-                y_i =  y_i.unsqueeze(1)
-        
+            # compute target q values with the Bellman equation
+            # rewards_batch doesnt have the right dimensions 
+            y_i =  rewards_batch + gamma * critic_target(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
+            y_i =  y_i.unsqueeze(1)
+    
 
-                # compute loss for both actor and critic networks 
-                loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
-                loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
-                loss.append(loss_critic)
+            # compute loss for both actor and critic networks 
+            loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
+            loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
+            loss.append(loss_critic)
 
-                # update actor network (for policy approximation)
-                actor_optim.zero_grad()
-                loss_actor.backward()
-                actor_optim.step() 
+            # update actor network (for policy approximation)
+            actor_optim.zero_grad()
+            loss_actor.backward()
+            actor_optim.step() 
 
-                # update critic network (for Q function approximation)
-                critic_optim.zero_grad() 
-                loss_critic.backward() 
-                critic_optim.step() 
+            # update critic network (for Q function approximation)
+            critic_optim.zero_grad() 
+            loss_critic.backward() 
+            critic_optim.step() 
 
-                # perform soft update to update the weights of the target networks 
-                # update target networks 
-                for target_param, param in zip(actor_target.parameters(), actor.parameters()):
-                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
-        
-                for target_param, param in zip(critic_target.parameters(), critic.parameters()):
-                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+            # perform soft update to update the weights of the target networks 
+            # update target networks 
+            for target_param, param in zip(actor_target.parameters(), actor.parameters()):
+                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+    
+            for target_param, param in zip(critic_target.parameters(), critic.parameters()):
+                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
      
         
         # update the nb of iteration before episode_done
         nb_iteration += 1
         max_iter += 1
+        epsilon =  epsilon = max(epsilon * 0.96, 0.01)
         
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
@@ -190,7 +192,7 @@ for episode in range(100):
     print("Total reward for the episode ", np.sum(reward))
     print(" ")
 
-    if(np.sum(reward) > -600): 
+    if(np.sum(reward) > -200): 
         np_img = env.img.to("cpu").detach().view(28, 28)
         np_img1 = env.original_image.to("cpu").detach().view(28,28)
         plt.subplot(1,2,1)
@@ -209,13 +211,7 @@ plt.show()
 
 
 
-
-
-
-    
-
-
-# todo: 
+# TODO: 
 # noise function 
 # cost function
 # impovement: use more powerfull neural nets for actor and critic networks
