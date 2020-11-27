@@ -15,6 +15,8 @@ from ReplayBuffer import ReplayBuffer
 # import MNIST Lenet5 model trained from MNIST_model.py 
 lenet = Lenet5()
 state = torch.load('models/mnist_lenet.pt')
+# lenet = Net()
+# state = torch.load("models/lenet_mnist_model.pth")
 lenet.load_state_dict(state) 
 lenet.eval()
 
@@ -24,7 +26,7 @@ device = torch.device("cuda" if(torch.cuda.is_available()) else "cpu")
 lenet.to(device)
 
 # import Mnist validation set 
-transform = transforms.Compose([transforms.ToTensor(),  transforms.Normalize((0.5,), (0.5,)),])
+transform = transforms.Compose([transforms.ToTensor(),])
 valset = datasets.MNIST('data/mnist/validation', train=False, download=True, transform=transform)
 valloader = torch.utils.data.DataLoader(valset, shuffle=True,  batch_size=1)
 
@@ -65,10 +67,10 @@ hidden_size = 512
 # other parameters 
 lr_critic = 0.0005                # learning rate for critic network 
 lr_actor = 0.1 * lr_critic        # learning rate for actor network 
-gamma = 0.9                       # discount factor 
+gamma = 0.9                      # discount factor 
 tau = 0.1                         # parameter for soft-update
 buffer_size = 50000                # replay buffer size (couldnt find the value for this parameter in the article)
-batch_size = 32                   # batch size for training of actor and critic network (coundnt find the value for this parameter in the article) 
+batch_size = 32                 # batch size for training of actor and critic network (coundnt find the value for this parameter in the article) 
 
 # init the replay buffer 
 replay_buffer = ReplayBuffer(buffer_size, 42)
@@ -92,7 +94,7 @@ critic_optim = optim.Adam(critic.parameters(), lr_critic)
 cumul_reward = [] 
 cumul_loss = [] 
 
-for episode in range(200): 
+for episode in range(100): 
     # TODO: implement noise process
     state = env.reset()
     reward = [] 
@@ -117,58 +119,60 @@ for episode in range(200):
 
         # check if enough samples stored in replay buffer 
         if(replay_buffer.buffer_len > batch_size): 
+
+            if(nb_iteration % 4 ==0):
           
-            # randomly sample a minibatch from the replay buffer 
-            minibatch = replay_buffer.get_batch(batch_size) 
-            # print(minibatch)
+                # randomly sample a minibatch from the replay buffer 
+                minibatch = replay_buffer.get_batch(batch_size) 
+                # print(minibatch)
 
-            # Unpack minibatch 
-            states_batch = np.array([x[0].numpy() for x in minibatch]) 
-            actions_batch = np.array([x[1].numpy() for x in minibatch]) 
-            rewards_batch = np.array([x[2] for x in minibatch]) 
-            next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
-            terminal = np.array([x[4] for x in minibatch]) 
-            
-            states_batch = torch.FloatTensor(states_batch)
-            actions_batch = torch.FloatTensor(actions_batch)
-            next_states_batch = torch.FloatTensor(next_states_batch)
-            rewards_batch = torch.FloatTensor(rewards_batch) 
-            terminal = torch.FloatTensor(terminal)
+                # Unpack minibatch 
+                states_batch = np.array([x[0].numpy() for x in minibatch]) 
+                actions_batch = np.array([x[1].numpy() for x in minibatch]) 
+                rewards_batch = np.array([x[2] for x in minibatch]) 
+                next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
+                terminal = np.array([x[4] for x in minibatch]) 
+                
+                states_batch = torch.FloatTensor(states_batch)
+                actions_batch = torch.FloatTensor(actions_batch)
+                next_states_batch = torch.FloatTensor(next_states_batch)
+                rewards_batch = torch.FloatTensor(rewards_batch) 
+                terminal = torch.FloatTensor(terminal)
 
-            # compute predicted q values           
-            q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
+                # compute predicted q values           
+                q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
 
-            # 1- compute next actions with actor target network 
-            next_actions = actor_target(next_states_batch.to(device))
+                # 1- compute next actions with actor target network 
+                next_actions = actor_target(next_states_batch.to(device))
 
-            # compute target q values with the Bellman equation
-            # rewards_batch doesnt have the right dimensions 
-            y_i =  rewards_batch + gamma * critic_target(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
-            y_i =  y_i.unsqueeze(1)
+                # compute target q values with the Bellman equation
+                # rewards_batch doesnt have the right dimensions 
+                y_i =  rewards_batch + gamma * critic_target(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
+                y_i =  y_i.unsqueeze(1)
         
 
-            # compute loss for both actor and critic networks 
-            loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
-            loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
-            loss.append(loss_critic)
+                # compute loss for both actor and critic networks 
+                loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
+                loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
+                loss.append(loss_critic)
 
-            # update actor network (for policy approximation)
-            actor_optim.zero_grad()
-            loss_actor.backward()
-            actor_optim.step() 
+                # update actor network (for policy approximation)
+                actor_optim.zero_grad()
+                loss_actor.backward()
+                actor_optim.step() 
 
-            # update critic network (for Q function approximation)
-            critic_optim.zero_grad() 
-            loss_critic.backward() 
-            critic_optim.step() 
+                # update critic network (for Q function approximation)
+                critic_optim.zero_grad() 
+                loss_critic.backward() 
+                critic_optim.step() 
 
-            # perform soft update to update the weights of the target networks 
-              # update target networks 
-            for target_param, param in zip(actor_target.parameters(), actor.parameters()):
-                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
-       
-            for target_param, param in zip(critic_target.parameters(), critic.parameters()):
-                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+                # perform soft update to update the weights of the target networks 
+                # update target networks 
+                for target_param, param in zip(actor_target.parameters(), actor.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+        
+                for target_param, param in zip(critic_target.parameters(), critic.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
      
         
         # update the nb of iteration before episode_done
@@ -186,16 +190,14 @@ for episode in range(200):
     print("Total reward for the episode ", np.sum(reward))
     print(" ")
 
-    # if(np.sum(reward) > -300): 
-    np_img = env.img.to("cpu").detach().view(28, 28)
-    np_img1 = env.original_image.to("cpu").detach().view(28,28)
-    print(np_img.max())
-    print(np_img1.max())
-    plt.subplot(1,2,1)
-    plt.imshow(np_img,  cmap="gray")
-    plt.subplot(2,2,2)
-    plt.imshow(np_img1,  cmap="gray")
-    plt.show()
+    if(np.sum(reward) > -600): 
+        np_img = env.img.to("cpu").detach().view(28, 28)
+        np_img1 = env.original_image.to("cpu").detach().view(28,28)
+        plt.subplot(1,2,1)
+        plt.imshow(np_img,  cmap="gray")
+        plt.subplot(2,2,2)
+        plt.imshow(np_img1,  cmap="gray")
+        plt.show()
 
 
 

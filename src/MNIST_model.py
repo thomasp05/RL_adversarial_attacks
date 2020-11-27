@@ -43,7 +43,6 @@ class Lenet5(nn.Module):
 
 # define the tranformation for the data 
 transform = transforms.Compose([transforms.ToTensor(),
-                                transforms.Normalize((0.5,), (0.5,)),
                                 ])
 
 # load the training and validation datasets 

@@ -39,6 +39,8 @@ class environment:
             # move img to device 
             self.img = self.img.to(self.device)
             self.original_image = self.img
+            # print(self.original_image.max())
+            # print(self.original_image.min())
             
             
             with torch.no_grad(): 
@@ -82,31 +84,28 @@ class environment:
         
         # add noise to perturbation
       
-        noise =  torch.rand(self.img.shape)
-        new_image = new_image #+ noise.to(self.device) 
-        action_ = new_image
+        noise = 0.01 *  torch.rand(self.img.shape)
+        new_image = new_image + noise.to(self.device) 
+        action_ = new_image + noise.to(self.device)
+        action_ = torch.clamp(action_, 0, 1)
 
-
-        # normalize the new image 
-        norm = transforms.Compose([transforms.Normalize((0.5,), (0.5,)),])
-        new_image = norm(new_image)
-        action_ = norm(action_)
         
         action_ = action_.unsqueeze(0)
 
-        print(action_.max()) 
-        print(action_.min())
-        print(new_image.max()) 
-        print(new_image.min())
-        print(" ")
-        # display the image 
-        np_img = new_image.to("cpu").detach().view(28, 28)
-        img2 = action_.squeeze(0).to("cpu").detach().view(28, 28)
-        plt.subplot(1,2,1)
-        plt.imshow(np_img,  cmap="gray")
-        plt.subplot(2,2,2)
-        plt.imshow(img2,  cmap="gray")
-        plt.show()
+        # print(" ")
+        # print(action_.max()) 
+        # print(action_.min())
+        # print(self.original_image.max()) 
+        # print(self.original_image.min())
+        # print(" ")
+        # # display the image 
+        # np_img = new_image.to("cpu").detach().view(28, 28)
+        # img2 = action_.squeeze(0).to("cpu").detach().view(28, 28)
+        # plt.subplot(1,2,1)
+        # plt.imshow(np_img,  cmap="gray")
+        # plt.subplot(2,2,2)
+        # plt.imshow(img2,  cmap="gray")
+        # plt.show()
 
         # # compute the new predictions and convolutional features map
         with torch.no_grad(): 
@@ -142,7 +141,7 @@ class environment:
         img_reward = img_reward.to("cpu").numpy().sum()
 
         # compute total reward 
-        reward =  np.abs(temp - temp2) - 0.1 * np.abs(img_reward) + pred_reward
+        reward =  np.abs(temp - temp2) - 0.4 * np.abs(img_reward) +  pred_reward
      
         
         # check if episode is done 
@@ -151,7 +150,11 @@ class environment:
             self.counter += 1
             if(self.counter >= 1): 
                 episode_done = True 
-                reward = reward + 100 #1000
+                reward = reward + 100 
+
+            print("real class:", self.label) 
+            print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
+            print("prediction vector:", new_prediction.to("cpu").numpy())
                 
             # # display the image 
             # np_img = new_image.to("cpu").detach().view(28, 28)
