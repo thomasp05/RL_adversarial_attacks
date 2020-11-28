@@ -1,5 +1,5 @@
 # this class is for the environment of the RL attack. 
-# 
+ 
 import numpy as np 
 import torch 
 from matplotlib import pyplot as plt
@@ -26,7 +26,6 @@ class environment:
         reset returns a the convolutional feature map of a random image from the data loader,
         its model prediction and one hot encoded label vector
         """ 
-
         prediction = -1
         self.label = -2
         while(prediction != self.label):
@@ -38,10 +37,7 @@ class environment:
 
             # move img to device 
             self.img = self.img.to(self.device)
-            self.original_image = self.img
-            # print(self.original_image.max())
-            # print(self.original_image.min())
-            
+            self.original_image = self.img            
             
             with torch.no_grad(): 
                 self.prediction = self.model(self.img.view(1, 1, 28, 28)).squeeze() 
@@ -59,73 +55,97 @@ class environment:
 
         # format the context 
         state = torch.cat((self.feature_map.type(torch.DoubleTensor), self.prediction.type(torch.DoubleTensor), one_hot.type(torch.DoubleTensor)), 0)
+        
         self.current_state = state.type(torch.FloatTensor)
 
         return self.current_state
         
 
-    def step(self, action, epsilon, t): 
+    def step(self, action, epsilon, t, target_class=-1): 
         """
         action:  vector containing image perturbations 
         """
-        new_image = action.view(-1, 28, 28)
-        new_image = new_image  + self.img  # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
         
-        # add noise to perturbation
-      
-        noise = torch.rand(self.img.shape) * epsilon
-        # new_image = new_image + noise.to(self.device) 
-        action_ = new_image + noise.to(self.device)
-        action_ = (action_ - action_.min()) / (action_.max() - action_.min()) 
+        perturbation = action.view(-1, 28, 28) 
+        new_image = self.img + perturbation# le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
 
+        # normalize the new image before passing it to the MNIST network 
+        new_image = (new_image - new_image.min()) / (new_image.max() - new_image.min()) 
+ 
         # compute the new predictions and convolutional features map
         with torch.no_grad(): 
-            new_prediction = self.model.forward(action_.unsqueeze(0)).squeeze() 
-            new_feature_map = self.model.featureMap(action_.unsqueeze(0)).squeeze()
+            new_prediction = self.model.forward(new_image.unsqueeze(0)).squeeze() 
+            new_feature_map = self.model.featureMap(new_image.unsqueeze(0)).squeeze()
+
+        # Compute the new one hot encoded vector
+        one_hot = torch.zeros(self.prediction.shape, device=self.device)
+        one_hot[torch.argmax(new_prediction)] = 1
+        self.one_hot = one_hot
+
 
         next_state = torch.cat((new_feature_map.type(torch.DoubleTensor), new_prediction.type(torch.DoubleTensor), self.one_hot.type(torch.DoubleTensor)), 0).type(torch.FloatTensor)
 
         #check if image is misclassified and compute reward 
         episode_done = False
        
-        ######################
-        ### calcul du reward # 
-        ######################
+        ########################
+        ### calcul du reward ### 
+        ########################
 
+        # implementation des rewards de l'article 
+        w1, w2, w3, w4, w5 = 1, 1, 1, 1, 1
+        c = 1
 
         # pour predicions des autres classes 
-        pred_reward = 0
+        predictions_other_classes = np.zeros(9) 
+        predictions_other_classes_previous = np.zeros(9) 
+        counter = 0
         for i, elem in enumerate(new_prediction): 
             if(i != self.label):
-                old = self.prediction[i].to("cpu").numpy()
-                new = elem.to("cpu").numpy()
-                temp3 = new - old 
-                pred_reward += temp3
+                predictions_other_classes[counter] = new_prediction[i].to("cpu").numpy()
+                predictions_other_classes_previous[counter] = self.prediction[i].to("cpu").numpy()
+                counter += 1
+                 
+        # max prediction qui n'est pas le true label 
+        max_pred_other_classes = np.max(predictions_other_classes)
 
-        # difference pour la classe originale de l'image
-        temp = self.prediction[self.label].to("cpu").numpy()
-        temp2 = new_prediction[self.label].to("cpu").numpy()
-
-        # difference btw feature map and new feature map
-        feature_reward = self.feature_map - new_feature_map
-        feature_reward = feature_reward.to("cpu").numpy().sum()
-
-        # difference btw image and new image 
-        img_reward = self.original_image.squeeze() - action_.squeeze()
-        img_reward = img_reward.to("cpu").numpy().sum()
-
-        # compute total reward 
-        # reward =  np.abs(temp - temp2) - 0.4 * np.abs(img_reward) #+  pred_reward
-        reward = - 1 * np.abs(img_reward) 
-
-     
+        # get prediction value for original class 
+        original_prediction = new_prediction[self.label].to("cpu").numpy()
+        original_prediction_previous = self.prediction[self.label].to("cpu").numpy()
         
-        # check if episode is done 
-        if(torch.argmax(new_prediction) != self.label): 
-               
-            episode_done = True 
-            reward = reward + 100 
+        # if target_class = -1, it is an untargeted attack 
+        if(target_class != -1):
+            target_prediction = new_prediction[target_class].to("cpu").numpy()   # we dont do targeted attacks for now 
+            target_prediction_previous = self.prediction[target_class].to("cpu").numpy()
+        else: 
+            target_prediction = predictions_other_classes.mean()
+            target_prediction_previous = predictions_other_classes_previous.mean()
+        
+        r1 = w1 * target_prediction 
+        r2 = w2 * (target_prediction - target_prediction_previous)
+        r3 = w3 * (target_prediction - original_prediction) 
+        r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
+        r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
+        r6 = -c
 
+
+        #difference per pixel with previous image  
+        img_reward = self.img.squeeze() - new_image.squeeze()
+        img_reward = img_reward.to("cpu").numpy().sum()
+        # print(np.abs(img_reward))
+
+        # reward = r1 + r4  - np.abs(img_reward)
+        reward =  r1 + - 2 / r5  -0.1 * np.abs(img_reward)
+        
+
+        # si aucune solution a ete trouve
+        # if(t == 99): 
+        #     reward = -1000
+
+        # check if episode is done 
+        if(torch.argmax(new_prediction) != self.label):
+            episode_done = True 
+            # reward = reward + 1000 
             print("real class:", self.label) 
             print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             print("prediction vector:", new_prediction.to("cpu").numpy())
@@ -134,8 +154,10 @@ class environment:
         # update prediction and feature map before exiting
         self.prediction = new_prediction
         self.feature_map = new_feature_map 
-        self.img = action_ 
+        self.img = new_image 
+        self.perturbation = perturbation
+        
 
-        return next_state, reward, episode_done
+        return next_state, reward, episode_done   # TODO: return predicted class when attack is successful
 
     

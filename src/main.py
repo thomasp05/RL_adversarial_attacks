@@ -13,7 +13,7 @@ from ReplayBuffer import ReplayBuffer
 
 
 # import MNIST Lenet5 model trained from MNIST_model.py 
-lenet = Lenet5()
+lenet = Net()
 state = torch.load('models/mnist_lenet.pt')
 # lenet = Net()
 # state = torch.load("models/lenet_mnist_model.pth")
@@ -58,11 +58,11 @@ def imshow(img):
 ########################
 
 # networks parameters 
-input_size_actor = 256 + 20 # the article uses 300 but idk which model they use for MNIST classfication 
+input_size_actor = 320 + 20 # the article uses 300 but idk which model they use for MNIST classfication 
 output_size_actor = 784
 input_size_critic = input_size_actor + output_size_actor     # because the input is the concatenation of the context and action state vectors 
 output_size_critic = 1
-hidden_size = 512
+hidden_size = 700 # 512
 
 # other parameters 
 lr_critic = 0.0005                # learning rate for critic network 
@@ -76,7 +76,7 @@ batch_size = 32                 # batch size for training of actor and critic ne
 replay_buffer = ReplayBuffer(buffer_size, 42)
 
 # init the adversarial environment
-env = environment(lenet, valset, device)
+env = environment(lenet, valset, device, 42)
 
 # Init the actor and critic models as well as their target models from the init class 
 actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)                 
@@ -96,7 +96,6 @@ cumul_loss = []
 epsilon = 1
 
 for episode in range(100): 
-    # TODO: implement noise process
     state = env.reset()
     reward = [] 
     loss = []
@@ -110,89 +109,96 @@ for episode in range(100):
         # with torch.no_grad():
         action = actor.forward(state.to(device))    # TODO: add noise 
 
+        # add noise to the action 
+
+        noise = torch.rand(action.shape) /(nb_iteration+1) * epsilon 
+        action =action + noise.to(device)
+        # action = action.clamp(0,1)  
+
+
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
         new_state, r, episode_done = env.step(action.detach(), epsilon, nb_iteration) 
         reward.append(r)
 
         # save observations in the replay buffer 
-        replay_buffer.store((state, action.to("cpu").detach(), r, new_state, episode_done)) 
+        replay_buffer.store((state, action.to("cpu").detach(), r, new_state)) 
         state = new_state
 
         # check if enough samples stored in replay buffer 
         if(replay_buffer.buffer_len > batch_size): 
 
-            # if(nb_iteration % 4 == 0):
-          
-            # randomly sample a minibatch from the replay buffer 
-            minibatch = replay_buffer.get_batch(batch_size) 
-            # print(minibatch)
+            if(nb_iteration % 1 == 0):
+                # randomly sample a minibatch from the replay buffer 
+                minibatch = replay_buffer.get_batch(batch_size) 
 
-            # Unpack minibatch 
-            states_batch = np.array([x[0].numpy() for x in minibatch]) 
-            actions_batch = np.array([x[1].numpy() for x in minibatch]) 
-            rewards_batch = np.array([x[2] for x in minibatch]) 
-            next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
-            terminal = np.array([x[4] for x in minibatch]) 
-            
-            states_batch = torch.FloatTensor(states_batch)
-            actions_batch = torch.FloatTensor(actions_batch)
-            next_states_batch = torch.FloatTensor(next_states_batch)
-            rewards_batch = torch.FloatTensor(rewards_batch) 
-            terminal = torch.FloatTensor(terminal)
+                # Unpack minibatch 
+                states_batch = np.array([x[0].numpy() for x in minibatch]) 
+                actions_batch = np.array([x[1].numpy() for x in minibatch]) 
+                rewards_batch = np.array([x[2] for x in minibatch]) 
+                next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
+                
+                states_batch = torch.FloatTensor(states_batch)
+                actions_batch = torch.FloatTensor(actions_batch)
+                next_states_batch = torch.FloatTensor(next_states_batch)
+                rewards_batch = torch.FloatTensor(rewards_batch) 
 
-            # compute predicted q values           
-            q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
+                # compute predicted q values           
+                q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
 
-            # 1- compute next actions with actor target network 
-            next_actions = actor_target(next_states_batch.to(device))
+                # 1- compute next actions with actor target network 
+                next_actions = actor_target.forward(next_states_batch.to(device))
 
-            # compute target q values with the Bellman equation
-            # rewards_batch doesnt have the right dimensions 
-            y_i =  rewards_batch + gamma * critic_target(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
-            y_i =  y_i.unsqueeze(1)
-    
+                # compute target q values with the Bellman equation
+                # rewards_batch doesnt have the right dimensions 
+                y_i =  rewards_batch + gamma * critic_target.forward(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
+                y_i =  y_i.unsqueeze(1)
+        
 
-            # compute loss for both actor and critic networks 
-            loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
-            loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
-            loss.append(loss_critic)
+                # compute loss for both actor and critic networks 
+                loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
+                loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
+                loss.append(loss_critic)
 
-            # update actor network (for policy approximation)
-            actor_optim.zero_grad()
-            loss_actor.backward()
-            actor_optim.step() 
+                # update actor network (for policy approximation)
+                actor_optim.zero_grad()
+                loss_actor.backward()
+                actor_optim.step() 
 
-            # update critic network (for Q function approximation)
-            critic_optim.zero_grad() 
-            loss_critic.backward() 
-            critic_optim.step() 
+                # update critic network (for Q function approximation)
+                critic_optim.zero_grad() 
+                loss_critic.backward() 
+                critic_optim.step() 
 
-            # perform soft update to update the weights of the target networks 
-            # update target networks 
-            for target_param, param in zip(actor_target.parameters(), actor.parameters()):
-                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
-    
-            for target_param, param in zip(critic_target.parameters(), critic.parameters()):
-                target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+                # perform soft update to update the weights of the target networks 
+                # update target networks 
+                for target_param, param in zip(actor_target.parameters(), actor.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+        
+                for target_param, param in zip(critic_target.parameters(), critic.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
      
         
         # update the nb of iteration before episode_done
         nb_iteration += 1
         max_iter += 1
-        epsilon =  epsilon = max(epsilon * 0.96, 0.01)
+    epsilon =  epsilon = max(epsilon * 0.96, 0.01)
+    print(" ")
+    print("New epsilon: ", epsilon)
+    print(" ")
         
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
     cumul_loss.append(np.sum(loss))
 
-    
 
     print("Number of iterations required for misclassification : ", nb_iteration)
     print("We are at episode: ", episode)
     print("Total reward for the episode ", np.sum(reward))
     print(" ")
 
-    if(np.sum(reward) > -200): 
+    if(episode_done): 
+        # predictions = lenet.forward(env.original_image.unsqueeze(0))
+        # print(predictions)
         np_img = env.img.to("cpu").detach().view(28, 28)
         np_img1 = env.original_image.to("cpu").detach().view(28,28)
         plt.subplot(1,2,1)
@@ -207,14 +213,16 @@ plt.plot(cumul_reward)
 plt.show()
 plt.plot(cumul_loss) 
 plt.show()
-        
+
+    
+# save the actor and critic models  
+state_actor = actor.state_dict()
+state_critic = critic.state_dict()
+torch.save(state_actor, 'DDPG_models/actor.pt')
+torch.save(state_critic, 'DDPG_models/critic.pt')
 
 
-
-# TODO: 
-# noise function 
-# cost function
-# impovement: use more powerfull neural nets for actor and critic networks
+    
 
 
 
