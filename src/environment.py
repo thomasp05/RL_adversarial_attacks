@@ -30,7 +30,7 @@ class environment:
         self.label = -2
         while(prediction != self.label):
              # compute random index for randomly selecting an image from the image set 
-            index = np.random.randint(0, self.nb_images)
+            index = np.random.randint(0, self.nb_images) # 7,9 ca donne de bon resultats
 
             # get the random image and compute its predicted class with the neural network 
             self.img, self.label = self.imgset.__getitem__(index) 
@@ -61,16 +61,16 @@ class environment:
         return self.current_state
         
 
-    def step(self, action, epsilon, t, target_class=-1): 
+    def step(self, action, t, target_class=-1): 
         """
         action:  vector containing image perturbations 
         """
         
         perturbation = action.view(-1, 28, 28) 
-        new_image = self.img + perturbation# le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
+        new_image = self.img + perturbation * 0.1  # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
 
         # normalize the new image before passing it to the MNIST network 
-        new_image = (new_image - new_image.min()) / (new_image.max() - new_image.min()) 
+        new_image = torch.clamp(new_image, 0, 1)   # Clamp pour garder dans le range [0,1]
  
         # compute the new predictions and convolutional features map
         with torch.no_grad(): 
@@ -81,7 +81,6 @@ class environment:
         one_hot = torch.zeros(self.prediction.shape, device=self.device)
         one_hot[torch.argmax(new_prediction)] = 1
         self.one_hot = one_hot
-
 
         next_state = torch.cat((new_feature_map.type(torch.DoubleTensor), new_prediction.type(torch.DoubleTensor), self.one_hot.type(torch.DoubleTensor)), 0).type(torch.FloatTensor)
 
@@ -128,29 +127,22 @@ class environment:
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
         r6 = -c
 
-
-        #difference per pixel with previous image  
-        img_reward = self.img.squeeze() - new_image.squeeze()
-        img_reward = img_reward.to("cpu").numpy().sum()
-        # print(np.abs(img_reward))
-
-        # reward = r1 + r4  - np.abs(img_reward)
-        reward =  r1 + - 2 / r5  -0.1 * np.abs(img_reward)
+        reward =  -  r5 
         
-
-        # si aucune solution a ete trouve
-        # if(t == 99): 
-        #     reward = -1000
+        #difference per pixel with previous image  
+        # img_reward = self.img.squeeze() - new_image.squeeze()
+        # img_reward = np.abs(img_reward.to("cpu").numpy())
+        # print(np.abs(img_reward))
+        # reward = r1 + r4  - np.abs(img_reward)
+        # reward =  -  r5  #-0.5 * np.abs(img_reward)
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
-            # reward = reward + 1000 
             print("real class:", self.label) 
             print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             print("prediction vector:", new_prediction.to("cpu").numpy())
 
-            
         # update prediction and feature map before exiting
         self.prediction = new_prediction
         self.feature_map = new_feature_map 
