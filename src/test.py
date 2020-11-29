@@ -76,8 +76,8 @@ actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
 critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
 
 # load trained state 
-state_actor = torch.load('DDPG_models/actor2.pt')
-state_critic = torch.load('DDPG_models/critic2.pt')
+state_actor = torch.load('DDPG_models/actor5.pt')
+state_critic = torch.load('DDPG_models/critic5.pt')
 actor.load_state_dict(state_actor) 
 critic.load_state_dict(state_critic) 
 actor.eval()
@@ -97,10 +97,10 @@ for episode in range(50):
     while not episode_done and max_iter < 100: 
         # compute the action to take with the actor network, which approximates the Q-function
         # with torch.no_grad():
-        action = actor.forward(state.to(device))  
+        action = actor.forward(state.to(device))   
 
-         # add noise to the action 
-        noise = torch.rand(action.shape) * epsilon #/ (nb_iteration+1) 
+        # add noise to the action 
+        noise = torch.rand(action.shape) * 0.1 
         action = action + noise.to(device)
 
 
@@ -120,7 +120,7 @@ for episode in range(50):
     print("Number of iterations required for misclassification : ", nb_iteration)
     print("We are at episode: ", episode)
     print("Total reward for the episode ", np.sum(reward))
-    # print(" ")
+    print(" ")
 
     if(episode_done): 
         # predictions = lenet.forward(env.img.unsqueeze(0))

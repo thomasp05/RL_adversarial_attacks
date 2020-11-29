@@ -67,7 +67,7 @@ class environment:
         """
         
         perturbation = action.view(-1, 28, 28) 
-        new_image = self.img + perturbation * 0.1  # le probleme est ici, je crois que jai besoin de update self.image et je dois rajouter self.currentimage (image modifiee au fil des iterationa)
+        new_image = self.img + perturbation * 0.1  # 0.1 cest la constante qui determine la force de la perturbation sur l'image
 
         # normalize the new image before passing it to the MNIST network 
         new_image = torch.clamp(new_image, 0, 1)   # Clamp pour garder dans le range [0,1]
@@ -87,6 +87,7 @@ class environment:
         #check if image is misclassified and compute reward 
         episode_done = False
        
+
         ########################
         ### calcul du reward ### 
         ########################
@@ -120,25 +121,19 @@ class environment:
             target_prediction = predictions_other_classes.mean()
             target_prediction_previous = predictions_other_classes_previous.mean()
         
-        r1 = w1 * target_prediction 
-        r2 = w2 * (target_prediction - target_prediction_previous)
-        r3 = w3 * (target_prediction - original_prediction) 
-        r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
+        # r1 = w1 * target_prediction 
+        # r2 = w2 * (target_prediction - target_prediction_previous)
+        # r3 = w3 * (target_prediction - original_prediction) 
+        # r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
         r6 = -c
 
-        reward =  -  r5 
-        
-        #difference per pixel with previous image  
-        # img_reward = self.img.squeeze() - new_image.squeeze()
-        # img_reward = np.abs(img_reward.to("cpu").numpy())
-        # print(np.abs(img_reward))
-        # reward = r1 + r4  - np.abs(img_reward)
-        # reward =  -  r5  #-0.5 * np.abs(img_reward)
+        reward = -r5 
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
+            # reward = reward + 1000
             print("real class:", self.label) 
             print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             print("prediction vector:", new_prediction.to("cpu").numpy())

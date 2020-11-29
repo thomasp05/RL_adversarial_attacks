@@ -104,13 +104,13 @@ for episode in range(100):
     max_iter = 0
 
     
-    while not episode_done and max_iter < 100: 
+    while not episode_done and max_iter <100: 
         # compute the action to take with the actor network, which approximates the Q-function
         # with torch.no_grad():
         action = actor.forward(state.to(device))  
 
         # add noise to the action 
-        noise = torch.rand(action.shape) * epsilon #/ (nb_iteration+1) 
+        noise = torch.rand(action.shape) * epsilon #/
         action = action + noise.to(device)
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
@@ -177,7 +177,7 @@ for episode in range(100):
         # update the nb of iteration before episode_done
         nb_iteration += 1
         max_iter += 1
-    epsilon =  epsilon = max(epsilon * 0.99, 0.1)
+    epsilon =  epsilon = max(epsilon * 0.99, 0.01)
         
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
@@ -187,9 +187,10 @@ for episode in range(100):
     print("Number of iterations required for misclassification : ", nb_iteration)
     print("We are at episode: ", episode)
     print("Total reward for the episode ", np.sum(reward))
+    print("Epsilon: ", epsilon)
     print(" ")
 
-    # if(episode_done): 
+    # if(episode_done and episode > 100): 
     #     predictions = lenet.forward(env.img.unsqueeze(0))
     #     print(predictions)
     #     np_img = env.img.to("cpu").detach().view(28, 28)
@@ -207,11 +208,11 @@ plt.plot(cumul_loss)
 plt.show()
 
     
-# save the actor and critic models  
-state_actor = actor.state_dict()
-state_critic = critic.state_dict()
-torch.save(state_actor, 'DDPG_models/actor2.pt')
-torch.save(state_critic, 'DDPG_models/critic2.pt')
+# save the actor and critic models  (if you want) 
+# state_actor = actor.state_dict()
+# state_critic = critic.state_dict()
+# torch.save(state_actor, 'DDPG_models/actor6.pt')
+# torch.save(state_critic, 'DDPG_models/critic6.pt')
 
 
     
