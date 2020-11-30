@@ -7,22 +7,26 @@ import torch
 import torchvision 
 from torchvision import datasets, transforms 
 import matplotlib.pyplot as plt 
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np 
 from copy import deepcopy
 from ReplayBuffer import ReplayBuffer
 
+pdf = PdfPages("images.pdf")
 
-# import MNIST Lenet5 model trained from MNIST_model.py 
-lenet = Net()
-state = torch.load('models/mnist_lenet.pt')
-# lenet = Net()
-# state = torch.load("models/lenet_mnist_model.pth")
-lenet.load_state_dict(state) 
-lenet.eval()
 
 # check if gpu available 
 print("CUDA available: ", torch.cuda.is_available()) 
 device = torch.device("cuda" if(torch.cuda.is_available()) else "cpu") 
+
+
+# import MNIST Lenet5 model trained from MNIST_model.py 
+lenet = Net()
+state = torch.load('models/mnist_lenet.pt', map_location=device)
+# lenet = Net()
+# state = torch.load("models/lenet_mnist_model.pth", map_location=device)
+lenet.load_state_dict(state) 
+lenet.eval()
 lenet.to(device)
 
 # import Mnist validation set 
@@ -190,22 +194,32 @@ for episode in range(100):
     print("Epsilon: ", epsilon)
     print(" ")
 
-    # if(episode_done and episode > 100): 
-    #     predictions = lenet.forward(env.img.unsqueeze(0))
-    #     print(predictions)
-    #     np_img = env.img.to("cpu").detach().view(28, 28)
-    #     np_img1 = env.original_image.to("cpu").detach().view(28,28)
-    #     plt.subplot(1,2,1)
-    #     plt.imshow(np_img,  cmap="Greys")
-    #     plt.subplot(2,2,2)
-    #     plt.imshow(np_img1,  cmap="Greys")
-    #     plt.show()
+    if episode_done: 
+        predictions = lenet.forward(env.img.unsqueeze(0))
+        print(predictions)
+
+        np_img = env.img.to("cpu").detach().view(28, 28)
+        np_img1 = env.original_image.to("cpu").detach().view(28,28)
+        fig = plt.figure()
+        plt.subplot(1,2,1)
+        plt.imshow(np_img,  cmap="Greys")
+        plt.title('Image générée')
+        plt.subplot(2,2,2)
+        plt.imshow(np_img1,  cmap="Greys")  
+        plt.title('Image originale')
+        classes = 'Classe réelle : ' + str(env.label) + ', classe prédite : ' + str(torch.argmax(predictions).to("cpu").numpy())
+        plt.text(0.05, 0.05, classes, transform=fig.transFigure, size=12)
+        pdf.savefig()
+        plt.close()
 
 
 plt.plot(cumul_reward) 
 plt.show()
 plt.plot(cumul_loss) 
 plt.show()
+
+
+pdf.close()
 
     
 # save the actor and critic models  (if you want) 
