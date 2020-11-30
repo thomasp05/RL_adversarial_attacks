@@ -122,18 +122,18 @@ class environment:
             target_prediction_previous = predictions_other_classes_previous.mean()
         
         # r1 = w1 * target_prediction 
-        # r2 = w2 * (target_prediction - target_prediction_previous)
+        r2 = w2 * (target_prediction - target_prediction_previous)
         # r3 = w3 * (target_prediction - original_prediction) 
         # r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
         r6 = -c
 
-        reward = -r5 
+        reward = -r5 + 2*r2
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
-            # reward = reward + 1000
+            reward = reward + 1000
             print("real class:", self.label) 
             print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             print("prediction vector:", new_prediction.to("cpu").numpy())

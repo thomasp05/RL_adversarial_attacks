@@ -76,10 +76,8 @@ actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
 critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
 
 # load trained state 
-state_actor = torch.load('DDPG_models/actor5.pt')
-state_critic = torch.load('DDPG_models/critic5.pt')
+state_actor = torch.load('DDPG_models/actor6.pt')
 actor.load_state_dict(state_actor) 
-critic.load_state_dict(state_critic) 
 actor.eval()
 actor.eval()
 epsilon = 1
@@ -101,7 +99,7 @@ for episode in range(50):
 
         # add noise to the action 
         noise = torch.rand(action.shape) * 0.1 
-        action = action + noise.to(device)
+        action = action #+ noise.to(device)
 
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward

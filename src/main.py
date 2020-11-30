@@ -12,7 +12,7 @@ import numpy as np
 from copy import deepcopy
 from ReplayBuffer import ReplayBuffer
 
-pdf = PdfPages("images.pdf")
+pdf = PdfPages("images_2.pdf")
 
 
 # check if gpu available 
@@ -99,7 +99,7 @@ cumul_reward = []
 cumul_loss = [] 
 epsilon = 1
 
-for episode in range(100): 
+for episode in range(10): 
     state = env.reset()
     reward = [] 
     loss = []
@@ -181,7 +181,7 @@ for episode in range(100):
         # update the nb of iteration before episode_done
         nb_iteration += 1
         max_iter += 1
-    epsilon =  epsilon = max(epsilon * 0.99, 0.01)
+    epsilon =  epsilon = max(epsilon * 0.9, 0.01)
         
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
@@ -222,11 +222,9 @@ plt.show()
 pdf.close()
 
     
-# save the actor and critic models  (if you want) 
-# state_actor = actor.state_dict()
-# state_critic = critic.state_dict()
-# torch.save(state_actor, 'DDPG_models/actor6.pt')
-# torch.save(state_critic, 'DDPG_models/critic6.pt')
+# save the actor model 
+state_actor = actor.state_dict()
+torch.save(state_actor, 'DDPG_models/actor6.pt')
 
 
     
