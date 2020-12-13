@@ -21,20 +21,25 @@ class environment:
         np.random.seed(seed)
         
 
-    def reset(self): 
+    def reset(self, target_label=None):
         """
+        target_label: label of the images to be returned, if None it can be any label
         reset returns a the convolutional feature map of a random image from the data loader,
         its model prediction and one hot encoded label vector
         """ 
         prediction = -1
         self.label = -2
         while(prediction != self.label):
-             # compute random index for randomly selecting an image from the image set 
-            index = np.random.randint(0, self.nb_images) # 7,9 ca donne de bon resultats
+            while True:
+                # compute random index for randomly selecting an image from the image set
+                index = np.random.randint(0, self.nb_images) # 7,9 ca donne de bon resultats
 
-            # get the random image and compute its predicted class with the neural network 
-            self.img, self.label = self.imgset.__getitem__(index) 
-
+                # get the random image and compute its predicted class with the neural network
+                self.img, self.label = self.imgset.__getitem__(index)
+        
+                if(target_label is None or self.label == target_label):
+                    break
+        
             # move img to device 
             self.img = self.img.to(self.device)
             self.original_image = self.img            
@@ -118,8 +123,8 @@ class environment:
             target_prediction = new_prediction[target_class].to("cpu").numpy()   # we dont do targeted attacks for now 
             target_prediction_previous = self.prediction[target_class].to("cpu").numpy()
         else: 
-            target_prediction = predictions_other_classes.mean()
-            target_prediction_previous = predictions_other_classes_previous.mean()
+            target_prediction = predictions_other_classes.max()
+            target_prediction_previous = predictions_other_classes_previous.max()
         
         # r1 = w1 * target_prediction 
         r2 = w2 * (target_prediction - target_prediction_previous)
@@ -128,7 +133,7 @@ class environment:
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
         r6 = -c
 
-        reward = -r5 + 2*r2
+        reward = r2 #-r5 #+ 2*r2
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):

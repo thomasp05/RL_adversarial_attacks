@@ -8,22 +8,24 @@ import torch
 import torchvision 
 from torchvision import datasets, transforms 
 import matplotlib.pyplot as plt 
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np 
 from copy import deepcopy
 from ReplayBuffer import ReplayBuffer
 
-
-# import MNIST Lenet5 model trained from MNIST_model.py 
-lenet = Net()
-state = torch.load('models/mnist_lenet.pt')
-# lenet = Net()
-# state = torch.load("models/lenet_mnist_model.pth")
-lenet.load_state_dict(state) 
-lenet.eval()
+pdf = PdfPages("images_test_label_9.pdf")
 
 # check if gpu available 
 print("CUDA available: ", torch.cuda.is_available()) 
 device = torch.device("cuda" if(torch.cuda.is_available()) else "cpu") 
+
+# import MNIST Lenet5 model trained from MNIST_model.py 
+lenet = Net()
+state = torch.load('models/mnist_lenet.pt', map_location=device)
+# lenet = Net()
+# state = torch.load("models/lenet_mnist_model.pth")
+lenet.load_state_dict(state) 
+lenet.eval()
 lenet.to(device)
 
 # import Mnist validation set 
@@ -76,15 +78,16 @@ actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
 critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
 
 # load trained state 
-state_actor = torch.load('DDPG_models/actor6.pt')
+state_actor = torch.load('DDPG_models/actor_label_9.pt')
 actor.load_state_dict(state_actor) 
 actor.eval()
 actor.eval()
 epsilon = 1
+target_label = 9
 
 #### main loop ####
-for episode in range(50): 
-    state = env.reset()
+for episode in range(100):
+    state = env.reset(target_label=target_label)
     reward = [] 
     loss = []
     episode_done = False 
@@ -99,7 +102,7 @@ for episode in range(50):
 
         # add noise to the action 
         noise = torch.rand(action.shape) * 0.1 
-        action = action #+ noise.to(device)
+        action = action + noise.to(device)
 
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
@@ -121,13 +124,23 @@ for episode in range(50):
     print(" ")
 
     if(episode_done): 
-        # predictions = lenet.forward(env.img.unsqueeze(0))
+        predictions = lenet.forward(env.img.unsqueeze(0))
         # print(predictions)
         # print(torch.argmax(predictions))
         np_img = env.img.to("cpu").detach().view(28, 28)
         np_img1 = env.original_image.to("cpu").detach().view(28,28)
+        fig = plt.figure()
         plt.subplot(1,2,1)
         plt.imshow(np_img,  cmap="Greys")
+        plt.title('Image générée')
         plt.subplot(2,2,2)
         plt.imshow(np_img1,  cmap="Greys")
-        plt.show()
+        plt.title('Image originale')
+        # plt.show()
+        classes = 'Classe réelle : ' + str(env.label) + ', classe prédite : ' + str(torch.argmax(predictions).to("cpu").numpy())
+        plt.text(0.05, 0.05, classes, transform=fig.transFigure, size=12)
+        pdf.savefig()
+        plt.close()
+
+
+pdf.close()

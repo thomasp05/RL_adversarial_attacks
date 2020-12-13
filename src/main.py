@@ -12,7 +12,7 @@ import numpy as np
 from copy import deepcopy
 from ReplayBuffer import ReplayBuffer
 
-pdf = PdfPages("images_2.pdf")
+pdf = PdfPages("images_train_label_9.pdf")
 
 
 # check if gpu available 
@@ -83,7 +83,11 @@ replay_buffer = ReplayBuffer(buffer_size, 42)
 env = environment(lenet, valset, device, 42)
 
 # Init the actor and critic models as well as their target models from the init class 
-actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)                 
+actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
+### On part d'un modèle entrainé sur toutes les classes pour faire l'entrainement de chaque classe
+#state_actor = torch.load('DDPG_models/actor_base.pt')
+#actor.load_state_dict(state_actor)
+
 critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
 actor_target = deepcopy(actor).to(device)
 critic_target = deepcopy(critic).to(device) 
@@ -98,9 +102,10 @@ critic_optim = optim.Adam(critic.parameters(), lr_critic)
 cumul_reward = [] 
 cumul_loss = [] 
 epsilon = 1
+target_label = 9
 
-for episode in range(10): 
-    state = env.reset()
+for episode in range(100): 
+    state = env.reset(target_label=target_label)
     reward = [] 
     loss = []
     episode_done = False 
@@ -181,7 +186,7 @@ for episode in range(10):
         # update the nb of iteration before episode_done
         nb_iteration += 1
         max_iter += 1
-    epsilon =  epsilon = max(epsilon * 0.9, 0.01)
+    epsilon =  epsilon = max(epsilon * 0.99, 0.01)
         
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
@@ -213,7 +218,10 @@ for episode in range(10):
         plt.close()
 
 
-plt.plot(cumul_reward) 
+plt.plot(cumul_reward)
+plt.xlabel('Episodes')
+plt.ylabel('Reward cumulatif')
+plt.title('Reward cumulatif par épisode')
 plt.show()
 plt.plot(cumul_loss) 
 plt.show()
@@ -224,7 +232,7 @@ pdf.close()
     
 # save the actor model 
 state_actor = actor.state_dict()
-torch.save(state_actor, 'DDPG_models/actor6.pt')
+torch.save(state_actor, 'DDPG_models/actor_label_9.pt')
 
 
     
