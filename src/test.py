@@ -78,7 +78,7 @@ actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
 critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
 
 # load trained state 
-state_actor = torch.load('DDPG_models/actor_label_9.pt')
+state_actor = torch.load('DDPG_models/targeted_attack_9.pt')
 actor.load_state_dict(state_actor) 
 actor.eval()
 actor.eval()
@@ -97,12 +97,11 @@ for episode in range(100):
     
     while not episode_done and max_iter < 100: 
         # compute the action to take with the actor network, which approximates the Q-function
-        # with torch.no_grad():
         action = actor.forward(state.to(device))   
 
         # add noise to the action 
         noise = torch.rand(action.shape) * 0.1 
-        action = action + noise.to(device)
+        action = action #+ noise.to(device)
 
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
@@ -136,7 +135,7 @@ for episode in range(100):
         plt.subplot(2,2,2)
         plt.imshow(np_img1,  cmap="Greys")
         plt.title('Image originale')
-        # plt.show()
+        plt.show()
         classes = 'Classe réelle : ' + str(env.label) + ', classe prédite : ' + str(torch.argmax(predictions).to("cpu").numpy())
         plt.text(0.05, 0.05, classes, transform=fig.transFigure, size=12)
         pdf.savefig()

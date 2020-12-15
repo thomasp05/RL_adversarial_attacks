@@ -12,8 +12,11 @@ import numpy as np
 from copy import deepcopy
 from ReplayBuffer import ReplayBuffer
 
-pdf = PdfPages("images_train_label_9.pdf")
+# set numpy seed 
+np.random.seed(42)
+torch.manual_seed(42) 
 
+pdf = PdfPages("targeted_attack_8222222.pdf")
 
 # check if gpu available 
 print("CUDA available: ", torch.cuda.is_available()) 
@@ -48,12 +51,17 @@ def imshow(img):
     plt.imshow(img,  cmap="Greys")
     plt.show()
 
-# get an image to attack from the valloader 
-# dataiter = iter(valloader) 
-# image, label = dataiter.next() 
-# with(torch.no_grad()):
-#     prediction = lenet.forward(image.to(device))
-#     feature_map = lenet.featureMap(image.to(device)).squeeze()
+
+# helper function pour les targeted attacks 
+def getImageOfClass(class_, valset): 
+    label = -1
+    while label != class_:
+        # compute random index for randomly selecting an image from the image set
+        index = np.random.randint(0, valset.__len__() - 1) # 7,9 ca donne de bon resultats
+
+        # get the random image and compute its predicted class with the neural network
+        img, label = valset.__getitem__(index)
+    return img, label
 
 
 
@@ -101,11 +109,13 @@ critic_optim = optim.Adam(critic.parameters(), lr_critic)
 #### main loop ####
 cumul_reward = [] 
 cumul_loss = [] 
+nb_queries = []
 epsilon = 1
 target_label = 9
 
-for episode in range(100): 
-    state = env.reset(target_label=target_label)
+
+for episode in range(300): 
+    state = env.reset()
     reward = [] 
     loss = []
     episode_done = False 
@@ -119,11 +129,15 @@ for episode in range(100):
         action = actor.forward(state.to(device))  
 
         # add noise to the action 
-        noise = torch.rand(action.shape) * epsilon #/
+        image, label = getImageOfClass(target_label, valset)
+        np_img1 = env.original_image.to("cpu").detach().view(784)
+        noise = (torch.rand(action.shape) * (image.view(784) - np_img1)) * epsilon# / (nb_iteration + 1)
+
         action = action + noise.to(device)
+        # action = torch.clamp(action, min=0)   # Clamp pour garder dans le range [0,1]
 
         # take a step in the environment with the action chosen from the actor netork and observe new state and reward
-        new_state, r, episode_done = env.step(action.detach(), nb_iteration) 
+        new_state, r, episode_done = env.step(action.detach(), nb_iteration, target_label) 
         reward.append(r)
 
         # save observations in the replay buffer 
@@ -191,6 +205,7 @@ for episode in range(100):
     # save information to asses performance after 
     cumul_reward.append(np.sum(reward))
     cumul_loss.append(np.sum(loss))
+    nb_queries.append(nb_iteration)
 
 
     print("Number of iterations required for misclassification : ", nb_iteration)
@@ -232,7 +247,7 @@ pdf.close()
     
 # save the actor model 
 state_actor = actor.state_dict()
-torch.save(state_actor, 'DDPG_models/actor_label_9.pt')
+torch.save(state_actor, 'DDPG_models/targeted_attack_9.pt')
 
 
     

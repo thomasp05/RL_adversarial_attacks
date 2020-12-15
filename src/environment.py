@@ -32,7 +32,7 @@ class environment:
         while(prediction != self.label):
             while True:
                 # compute random index for randomly selecting an image from the image set
-                index = np.random.randint(0, self.nb_images) # 7,9 ca donne de bon resultats
+                index = np.random.randint(0, self.nb_images - 1) # 7,9 ca donne de bon resultats
 
                 # get the random image and compute its predicted class with the neural network
                 self.img, self.label = self.imgset.__getitem__(index)
