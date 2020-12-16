@@ -81,13 +81,12 @@ critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device)
 state_actor = torch.load('DDPG_models/targeted_attack_9.pt')
 actor.load_state_dict(state_actor) 
 actor.eval()
-actor.eval()
 epsilon = 1
 target_label = 9
 
 #### main loop ####
 for episode in range(100):
-    state = env.reset(target_label=target_label)
+    state = env.reset()
     reward = [] 
     loss = []
     episode_done = False 

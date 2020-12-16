@@ -21,18 +21,19 @@ class environment:
         np.random.seed(seed)
         
 
-    def reset(self, target_label=None):
+    def reset(self, target_label=None, attack_label=None):
         """
         target_label: label of the images to be returned, if None it can be any label
+        attack_label: label of the targeted class for the targeted attack
         reset returns a the convolutional feature map of a random image from the data loader,
         its model prediction and one hot encoded label vector
         """ 
         prediction = -1
         self.label = -2
-        while(prediction != self.label):
+        while(prediction != self.label or prediction==attack_label):
             while True:
                 # compute random index for randomly selecting an image from the image set
-                index = np.random.randint(0, self.nb_images - 1) # 7,9 ca donne de bon resultats
+                index = np.random.randint(0, self.nb_images - 1) 
 
                 # get the random image and compute its predicted class with the neural network
                 self.img, self.label = self.imgset.__getitem__(index)
@@ -77,6 +78,9 @@ class environment:
         # normalize the new image before passing it to the MNIST network 
         new_image = torch.clamp(new_image, 0, 1)   # Clamp pour garder dans le range [0,1]
  
+        # compute the perturbation after clamping 
+        perturbation = new_image - self.original_image
+
         # compute the new predictions and convolutional features map
         with torch.no_grad(): 
             new_prediction = self.model.forward(new_image.unsqueeze(0)).squeeze() 
@@ -132,16 +136,27 @@ class environment:
         # r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
         r6 = -c
+        reward = - r5 
 
-        reward = r2 #-r5 #+ 2*r2
+        # fonction de reward du deuxieme article
+        # reward = 0
+        # if r2 > 0: 
+        #     reward += 4
+        # else: 
+        #     reward = reward - 2
+        # if original_prediction - original_prediction_previous < 0: 
+        #     reward += 4
+        # else: 
+        #     reward = reward -2
+        # reward = reward - 0.2 * r5
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
             reward = reward + 1000
-            print("real class:", self.label) 
-            print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
-            print("prediction vector:", new_prediction.to("cpu").numpy())
+            # print("real class:", self.label) 
+            # print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
+            # print("prediction vector:", new_prediction.to("cpu").numpy())
 
         # update prediction and feature map before exiting
         self.prediction = new_prediction
@@ -150,6 +165,6 @@ class environment:
         self.perturbation = perturbation
         
 
-        return next_state, reward, episode_done   # TODO: return predicted class when attack is successful
+        return next_state, reward, episode_done 
 
     
