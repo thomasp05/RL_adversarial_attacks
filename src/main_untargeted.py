@@ -80,250 +80,242 @@ tau = 0.1                         # parameter for soft-update
 buffer_size = 50000                # replay buffer size (couldnt find the value for this parameter in the article)
 batch_size = 32                 # batch size for training of actor and critic network (coundnt find the value for this parameter in the article) 
 
+# important variables 
+cumul_reward = [] 
+cumul_loss = [] 
+nb_queries = []
+cumul_norm = []
+original_labels = []
+predicted_labels = []
+epsilon = 1
+epsilon_decay = 0.99
+epsilon_min = 0.1
+nb_episode = 100
+successful_attacks = 0
 
-# loop through all classes 
-for i in range(10):
+# variable for the attack and specific class label
+fileName = "untargetedattacks_other/results/untargeted_attack{0}.pdf".format(nb_episode)
+modelName = 'untargetedattacks_other/models/untargeted_attack{0}.pt'.format(nb_episode)
 
-    # important variables 
-    cumul_reward = [] 
-    cumul_loss = [] 
-    nb_queries = []
-    cumul_norm = []
-    original_labels = []
-    predicted_labels = []
-    epsilon = 1
-    epsilon_decay = 0.99
-    epsilon_min = 0.1
-    nb_episode = 5
-    successful_attacks = 0
+# name of the textfile where the results will be saved
+textFileName = "untargetedattacks_other/results_untargetedattacks_{0}.txt".format(nb_episode)
 
-    # variable for the attack and specific class label
-    target_label = i
-    fileName = "untargetedattacks/results/untargeted_attack{0}_{1}.pdf".format(nb_episode, i)
-    modelName = 'untargetedattacks/models/untargeted_attack{0}_{1}.pt'.format(nb_episode, i)
+# name for plots 
+reward_plot_name = "untargetedattacks_other/plots/cumul_reward_{0}.png".format(nb_episode)
+loss_plot_name = 'untargetedattacks_other/plots/cumul_loss_{0}.png'.format(nb_episode)
+
+# open the pdf to save the images 
+pdf = PdfPages(fileName)
+
+# init the replay buffer 
+replay_buffer = ReplayBuffer(buffer_size, 42)
+
+# init the adversarial environment
+env = environment(lenet, valset, device, 42)
+
+# Init the actor and critic models as well as their target models from the init class 
+actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
+critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
+actor_target = deepcopy(actor).to(device)
+critic_target = deepcopy(critic).to(device) 
+
+actor.train() 
+critic.train() 
+actor_target.train() 
+critic_target.train()
+
+# init the model loss funcitions and optimizers 
+critic_criterion = nn.MSELoss()                           # actor_loss is not defined here because it is computed using the critic network according to the DDPG algorithm
+actor_optim = optim.Adam(actor.parameters(), lr_actor) 
+critic_optim = optim.Adam(critic.parameters(), lr_critic) 
+
+#### main loop ####
+for episode in range(nb_episode): 
+    state = env.reset()
+    reward = [] 
+    loss = []
+    episode_done = False 
+    nb_iteration = 0
+    max_iter = 0
+    attack_norm = 0
     
-    # name of the textfile where the results will be saved
-    textFileName = "untargetedattacks/results_untargetedattacks_{0}.txt".format(nb_episode)
+    while not episode_done and max_iter <100: 
+        # compute the action to take with the actor network, which approximates the Q-function
+        action = actor.forward(state.to(device))  
 
-    # name for plots 
-    reward_plot_name = "untargetedattacks/plots/cumul_reward_{0}_{1}.png".format(nb_episode, i)
-    loss_plot_name = 'untargetedattacks/plots/cumul_loss_{0}_{1}.png'.format(nb_episode, i)
+        # add noise to the action 
+        noise = torch.rand(action.shape) * epsilon # / (nb_iteration + 1)
 
-    # open the pdf to save the images 
-    pdf = PdfPages(fileName)
+        action = action + noise.to(device)
 
-    # init the replay buffer 
-    replay_buffer = ReplayBuffer(buffer_size, 42)
+        # take a step in the environment with the action chosen from the actor netork and observe new state and reward
+        new_state, r, episode_done = env.step(action.detach(), nb_iteration) 
+        reward.append(r)
 
-    # init the adversarial environment
-    env = environment(lenet, valset, device, 42)
+        # save observations in the replay buffer 
+        replay_buffer.store((state, action.to("cpu").detach(), r, new_state)) 
+        state = new_state
 
-    # Init the actor and critic models as well as their target models from the init class 
-    actor = Actor(input_size_actor, hidden_size, output_size_actor).to(device)
-    critic = Critic(input_size_critic, hidden_size, output_size_critic).to(device) 
-    actor_target = deepcopy(actor).to(device)
-    critic_target = deepcopy(critic).to(device) 
+        # check if enough samples stored in replay buffer 
+        if(replay_buffer.buffer_len > batch_size): 
 
-    actor.train() 
-    critic.train() 
-    actor_target.train() 
-    critic_target.train()
+            if(nb_iteration % 1 == 0):
+                # randomly sample a minibatch from the replay buffer 
+                minibatch = replay_buffer.get_batch(batch_size) 
 
-    # init the model loss funcitions and optimizers 
-    critic_criterion = nn.MSELoss()                           # actor_loss is not defined here because it is computed using the critic network according to the DDPG algorithm
-    actor_optim = optim.Adam(actor.parameters(), lr_actor) 
-    critic_optim = optim.Adam(critic.parameters(), lr_critic) 
+                # Unpack minibatch 
+                states_batch = np.array([x[0].numpy() for x in minibatch]) 
+                actions_batch = np.array([x[1].numpy() for x in minibatch]) 
+                rewards_batch = np.array([x[2] for x in minibatch]) 
+                next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
+                
+                states_batch = torch.FloatTensor(states_batch)
+                actions_batch = torch.FloatTensor(actions_batch)
+                next_states_batch = torch.FloatTensor(next_states_batch)
+                rewards_batch = torch.FloatTensor(rewards_batch) 
 
-    #### main loop ####
-    for episode in range(nb_episode): 
-        state = env.reset()
-        reward = [] 
-        loss = []
-        episode_done = False 
-        nb_iteration = 0
-        max_iter = 0
-        attack_norm = 0
+                # compute predicted q values           
+                q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
+
+                # 1- compute next actions with actor target network 
+                next_actions = actor_target.forward(next_states_batch.to(device))
+
+                # compute target q values with the Bellman equation
+                y_i =  rewards_batch + gamma * critic_target.forward(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
+                y_i =  y_i.unsqueeze(1)
         
-        while not episode_done and max_iter <100: 
-            # compute the action to take with the actor network, which approximates the Q-function
-            action = actor.forward(state.to(device))  
+                # compute loss for both actor and critic networks 
+                loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
+                loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
+                loss.append(loss_critic)
 
-            # add noise to the action 
-            noise = torch.rand(action.shape) * epsilon # / (nb_iteration + 1)
+                # update actor network (for policy approximation)
+                actor_optim.zero_grad()
+                loss_actor.backward()
+                actor_optim.step() 
 
-            action = action + noise.to(device)
+                # update critic network (for Q function approximation)
+                critic_optim.zero_grad() 
+                loss_critic.backward() 
+                critic_optim.step() 
 
-            # take a step in the environment with the action chosen from the actor netork and observe new state and reward
-            new_state, r, episode_done = env.step(action.detach(), nb_iteration, target_label) 
-            reward.append(r)
-
-            # save observations in the replay buffer 
-            replay_buffer.store((state, action.to("cpu").detach(), r, new_state)) 
-            state = new_state
-
-            # check if enough samples stored in replay buffer 
-            if(replay_buffer.buffer_len > batch_size): 
-
-                if(nb_iteration % 1 == 0):
-                    # randomly sample a minibatch from the replay buffer 
-                    minibatch = replay_buffer.get_batch(batch_size) 
-
-                    # Unpack minibatch 
-                    states_batch = np.array([x[0].numpy() for x in minibatch]) 
-                    actions_batch = np.array([x[1].numpy() for x in minibatch]) 
-                    rewards_batch = np.array([x[2] for x in minibatch]) 
-                    next_states_batch = np.array([x[3].numpy() for x in minibatch]) 
-                    
-                    states_batch = torch.FloatTensor(states_batch)
-                    actions_batch = torch.FloatTensor(actions_batch)
-                    next_states_batch = torch.FloatTensor(next_states_batch)
-                    rewards_batch = torch.FloatTensor(rewards_batch) 
-
-                    # compute predicted q values           
-                    q_values = critic.forward(states_batch.to(device), actions_batch.to(device))
-
-                    # 1- compute next actions with actor target network 
-                    next_actions = actor_target.forward(next_states_batch.to(device))
-
-                    # compute target q values with the Bellman equation
-                    y_i =  rewards_batch + gamma * critic_target.forward(next_states_batch.to(device), next_actions.detach().to(device)).to("cpu").squeeze()
-                    y_i =  y_i.unsqueeze(1)
-            
-                    # compute loss for both actor and critic networks 
-                    loss_critic = critic_criterion(q_values.to(device), y_i.to(device)) 
-                    loss_actor = -critic.forward(states_batch.to(device), actor.forward(states_batch.to(device)).to(device)).mean()
-                    loss.append(loss_critic)
-
-                    # update actor network (for policy approximation)
-                    actor_optim.zero_grad()
-                    loss_actor.backward()
-                    actor_optim.step() 
-
-                    # update critic network (for Q function approximation)
-                    critic_optim.zero_grad() 
-                    loss_critic.backward() 
-                    critic_optim.step() 
-
-                    # perform soft update to update the weights of the target networks 
-                    # update target networks 
-                    for target_param, param in zip(actor_target.parameters(), actor.parameters()):
-                        target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
-            
-                    for target_param, param in zip(critic_target.parameters(), critic.parameters()):
-                        target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+                # perform soft update to update the weights of the target networks 
+                # update target networks 
+                for target_param, param in zip(actor_target.parameters(), actor.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
         
-            # update the nb of iteration before episode_done
-            nb_iteration += 1
-            max_iter += 1
-        epsilon =  epsilon = max(epsilon * epsilon_decay, epsilon_min)
-            
-        # save information to assess performance later
-        cumul_reward.append(np.sum(reward))
-        cumul_loss.append(np.sum(loss))
-        nb_queries.append(nb_iteration)
-        original_labels.append(env.label)
+                for target_param, param in zip(critic_target.parameters(), critic.parameters()):
+                    target_param.data.copy_(param.data * tau + target_param.data * (1.0 - tau))
+    
+        # update the nb of iteration before episode_done
+        nb_iteration += 1
+        max_iter += 1
+    epsilon =  epsilon = max(epsilon * epsilon_decay, epsilon_min)
+        
+    # save information to assess performance later
+    cumul_reward.append(np.sum(reward))
+    cumul_loss.append(np.sum(loss))
+    nb_queries.append(nb_iteration)
+    original_labels.append(env.label)
 
-        if episode_done: 
-            # increment counter 
-            successful_attacks += 1
-            
-            # get the prediction of the target network and the original and perturbed images 
-            predictions = lenet.forward(env.img.unsqueeze(0))
-            perturbed_image = env.img.to("cpu").detach().view(28, 28)
-            original_image = env.original_image.to("cpu").detach().view(28,28)
+    if episode_done: 
+        # increment counter 
+        successful_attacks += 1
+        
+        # get the prediction of the target network and the original and perturbed images 
+        predictions = lenet.forward(env.img.unsqueeze(0))
+        perturbed_image = env.img.to("cpu").detach().view(28, 28)
+        original_image = env.original_image.to("cpu").detach().view(28,28)
 
-            perturbation = perturbed_image - original_image
-            l2_norm = np.linalg.norm(perturbation) 
-            cumul_norm.append(l2_norm) 
-            pred_label = torch.argmax(predictions).to("cpu").detach().numpy().item()
-            predicted_labels.append(pred_label)
+        perturbation = perturbed_image - original_image
+        l2_norm = np.linalg.norm(perturbation) 
+        cumul_norm.append(l2_norm) 
+        pred_label = torch.argmax(predictions).to("cpu").detach().numpy().item()
+        predicted_labels.append(pred_label)
 
-            fig = plt.figure()
-            plt.subplot(1,2,1)
-            plt.imshow(perturbed_image,  cmap="Greys")
-            plt.title('Image générée')
-            plt.subplot(2,2,2)
-            plt.imshow(original_image,  cmap="Greys")  
-            plt.title('Image originale')
-            classes = 'Classe réelle : ' + str(env.label) + ', classe prédite : ' + str(torch.argmax(predictions).to("cpu").numpy())
-            plt.text(0.05, 0.05, classes, transform=fig.transFigure, size=12)
-            pdf.savefig()
-            plt.close()
-        else: 
-            predicted_labels.append(env.label)
+        fig = plt.figure()
+        plt.subplot(1,2,1)
+        plt.imshow(perturbed_image,  cmap="Greys")
+        plt.title('Image générée')
+        plt.subplot(2,2,2)
+        plt.imshow(original_image,  cmap="Greys")  
+        plt.title('Image originale')
+        classes = 'Classe réelle : ' + str(env.label) + ', classe prédite : ' + str(torch.argmax(predictions).to("cpu").numpy())
+        plt.text(0.05, 0.05, classes, transform=fig.transFigure, size=12)
+        pdf.savefig()
+        plt.close()
+    else: 
+        predicted_labels.append(env.label)
 
-    # print results
-    print("Target class : ", i)
-    print("Average nb of queries : ", np.sum(nb_queries) / nb_episode)
-    print("Accuracy", successful_attacks / nb_episode)
-    print("Average norm ", np.sum(cumul_norm) / successful_attacks)
+# print results
+print("Average nb of queries : ", np.sum(nb_queries) / nb_episode)
+print("Accuracy", successful_attacks / nb_episode)
+print("Average norm ", np.sum(cumul_norm) / successful_attacks)
 
-    # save the actor model and close pdf
-    pdf.close()
-    state_actor = actor.state_dict()
-    torch.save(state_actor, modelName)
+# save the actor model and close pdf
+pdf.close()
+state_actor = actor.state_dict()
+torch.save(state_actor, modelName)
 
-    # plot cumulative reward and loss and save to png  
-    plt.figure()
-    plt.plot(cumul_reward)
-    plt.xlabel('Episodes')
-    plt.ylabel('Reward cumulatif')
-    plt.title('Reward cumulatif par épisode')
-    plt.savefig(reward_plot_name)
+# plot cumulative reward and loss and save to png  
+plt.figure()
+plt.plot(cumul_reward)
+plt.xlabel('Episodes')
+plt.ylabel('Reward cumulatif')
+plt.title('Reward cumulatif par épisode')
+plt.savefig(reward_plot_name)
 
-    plt.figure()
-    plt.plot(cumul_loss) 
-    plt.xlabel('Episodes')
-    plt.ylabel('Loss cumulative')
-    plt.title('Loss cumulative par épisode')
-    plt.savefig(loss_plot_name)
+plt.figure()
+plt.plot(cumul_loss) 
+plt.xlabel('Episodes')
+plt.ylabel('Loss cumulative')
+plt.title('Loss cumulative par épisode')
+plt.savefig(loss_plot_name)
 
 
-    # last step is to test the generalisation performance of the model 
-    # load trained state 
-    state_actor = torch.load(modelName)
-    actor.load_state_dict(state_actor) 
-    actor.eval()
-    success = 0
+# last step is to test the generalisation performance of the model 
+# load trained state 
+state_actor = torch.load(modelName)
+actor.load_state_dict(state_actor) 
+actor.eval()
+success = 0
 
-    for episode in range(nb_episode):
-        state = env.reset()
-        reward = [] 
-        loss = []
-        episode_done = False 
-        nb_iteration = 0
-        max_iter = 0
+for episode in range(nb_episode):
+    state = env.reset()
+    reward = [] 
+    loss = []
+    episode_done = False 
+    nb_iteration = 0
+    max_iter = 0
 
-        while not episode_done and max_iter < 100: 
-            # compute the action to take with the actor network, which approximates the Q-function
-            action = actor.forward(state.to(device))   
+    while not episode_done and max_iter < 100: 
+        # compute the action to take with the actor network, which approximates the Q-function
+        action = actor.forward(state.to(device))   
 
-            # take a step in the environment with the action chosen from the actor netork and observe new state and reward
-            new_state, r, episode_done = env.step(action.detach(), nb_iteration) 
-            reward.append(r)
-            state = new_state
+        # take a step in the environment with the action chosen from the actor netork and observe new state and reward
+        new_state, r, episode_done = env.step(action.detach(), nb_iteration) 
+        reward.append(r)
+        state = new_state
 
-            # update the nb of iteration before episode_done
-            nb_iteration += 1
-            max_iter += 1
+        # update the nb of iteration before episode_done
+        nb_iteration += 1
+        max_iter += 1
 
-        if(episode_done): 
-            success += 1
+    if(episode_done): 
+        success += 1
 
-    # print results 
-    print("Performance en généralisation : {0}\n".format(success/nb_episode))
+# print results 
+print("Performance en généralisation : {0}\n".format(success/nb_episode))
 
-    # save results to a text file
-    print(predicted_labels)
-    with open(textFileName, "a") as text_file:
-        text_file.write("target class : {0} \n".format(i))
-        text_file.write("Average nb of queries : {0}\n".format(np.sum(nb_queries) / nb_episode))
-        text_file.write("Accuracy : {0}\n".format(successful_attacks / nb_episode))
-        text_file.write("Average norm : {0}\n".format(np.sum(cumul_norm) / successful_attacks))
-        text_file.write("Original class: {0}\n".format(str(original_labels)))
-        text_file.write("Predicted class : {0}\n".format(str(predicted_labels)))
-        text_file.write("Performance en généralisation : {0}\n".format(success/nb_episode))
-        text_file.write("\n")
+# save results to a text file
+with open(textFileName, "a") as text_file:
+    text_file.write("Average nb of queries : {0}\n".format(np.sum(nb_queries) / nb_episode))
+    text_file.write("Accuracy : {0}\n".format(successful_attacks / nb_episode))
+    text_file.write("Average norm : {0}\n".format(np.sum(cumul_norm) / successful_attacks))
+    text_file.write("Original class: {0}\n".format(str(original_labels)))
+    text_file.write("Predicted class : {0}\n".format(str(predicted_labels)))
+    text_file.write("Performance en généralisation : {0}\n".format(success/nb_episode))
+    text_file.write("\n")
 
 
 

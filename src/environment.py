@@ -135,25 +135,28 @@ class environment:
         # r3 = w3 * (target_prediction - original_prediction) 
         # r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
-        r6 = -c
+        # r6 = -c
+
+        # fonctions de rewards que l'on test
         reward = - r5 
+        # reward = r2
 
         # fonction de reward du deuxieme article
-        # reward = 0
-        # if r2 > 0: 
-        #     reward += 4
-        # else: 
-        #     reward = reward - 2
-        # if original_prediction - original_prediction_previous < 0: 
-        #     reward += 4
-        # else: 
-        #     reward = reward -2
-        # reward = reward - 0.2 * r5
+        reward = 0
+        if r2 > 0: 
+            reward += 4
+        else: 
+            reward = reward - 2
+        if original_prediction - original_prediction_previous < 0: 
+            reward += 4
+        else: 
+            reward = reward -2
+        reward = reward - 0.2 * r5
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
-            reward = reward + 1000
+            # reward = reward + 1000
             # print("real class:", self.label) 
             # print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
             # print("prediction vector:", new_prediction.to("cpu").numpy())
