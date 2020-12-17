@@ -54,7 +54,6 @@ class environment:
             self.feature_map = self.model.featureMap(self.img.view(1, 1, 28, 28)).squeeze() 
 
         # create the one-hot encoded vector for the label 
-        # one_hot = np.zeros(self.prediction.shape)
         one_hot = torch.zeros(self.prediction.shape, device=self.device)
         one_hot[self.label] = 1
         self.one_hot = one_hot
@@ -130,18 +129,18 @@ class environment:
             target_prediction = predictions_other_classes.max()
             target_prediction_previous = predictions_other_classes_previous.max()
         
-        # r1 = w1 * target_prediction 
         r2 = w2 * (target_prediction - target_prediction_previous)
-        # r3 = w3 * (target_prediction - original_prediction) 
-        # r4 = w4 * (max(0, (target_prediction - max_pred_other_classes)))
         r5 = w5 * torch.norm(perturbation).to("cpu").numpy()
-        # r6 = -c
 
         # fonctions de rewards que l'on test
-        reward = - r5 
-        # reward = r2
 
-        # fonction de reward du deuxieme article
+        # fonction qui correspond à R1 et R2 dans le rapport 
+        reward = r2
+        
+        # fonction qui correspond à R3 et R4 dans le rapport
+        reward = - r5 
+
+        # fonction de reward du deuxieme article (fonction qui correspond à R5 dans le rapport)
         # reward = 0
         # if r2 > 0: 
         #     reward += 4
@@ -156,6 +155,8 @@ class environment:
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
+
+            # boni de 1000 que l'on ajoute à R2 et R4 dans le rapport
             reward = reward + 1000
 
         # update prediction and feature map before exiting

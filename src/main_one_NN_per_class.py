@@ -35,12 +35,6 @@ transform = transforms.Compose([transforms.ToTensor(),])
 valset = datasets.MNIST('data/mnist/validation', train=False, download=True, transform=transform)
 valloader = torch.utils.data.DataLoader(valset, shuffle=True,  batch_size=1)
 
-#test mnist lenet5 model performance 
-# all_count, correct_count = lenet.evaluate(valloader, device)
-# print("Number of Images Tested=", all_count) 
-# print("Model Accuracy =", (correct_count/all_count)*100)
-
-
 # helper function for displaying an image 
 def imshow(img):
     img = img.squeeze()

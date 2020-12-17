@@ -54,6 +54,7 @@ class Critic(nn.Module):
         return x
 
 
+# premier modèle LeNet que nous avons essayé
 class Lenet5(nn.Module): 
     def __init__(self):
         super().__init__()
@@ -118,6 +119,7 @@ class Lenet5(nn.Module):
         return all_count, correct_count
 
 
+# Modèle Lenet que nous avons utilisé pour les expérimentations
 # LeNet Model definition from https://github.com/pytorch/examples/tree/master/mnist
 class Net(nn.Module):
     def __init__(self):
