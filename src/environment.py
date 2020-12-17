@@ -156,7 +156,7 @@ class environment:
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
-            # reward = reward + 1000
+            reward = reward + 1000
 
         # update prediction and feature map before exiting
         self.prediction = new_prediction
