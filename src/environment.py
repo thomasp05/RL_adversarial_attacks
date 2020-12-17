@@ -142,24 +142,21 @@ class environment:
         # reward = r2
 
         # fonction de reward du deuxieme article
-        reward = 0
-        if r2 > 0: 
-            reward += 4
-        else: 
-            reward = reward - 2
-        if original_prediction - original_prediction_previous < 0: 
-            reward += 4
-        else: 
-            reward = reward -2
-        reward = reward - 0.2 * r5
+        # reward = 0
+        # if r2 > 0: 
+        #     reward += 4
+        # else: 
+        #     reward = reward - 2
+        # if original_prediction - original_prediction_previous < 0: 
+        #     reward += 4
+        # else: 
+        #     reward = reward -2
+        # reward = reward - 0.2 * r5
 
         # check if episode is done 
         if(torch.argmax(new_prediction) != self.label):
             episode_done = True 
             # reward = reward + 1000
-            # print("real class:", self.label) 
-            # print("predicted class:", torch.argmax(new_prediction).to("cpu").numpy())
-            # print("prediction vector:", new_prediction.to("cpu").numpy())
 
         # update prediction and feature map before exiting
         self.prediction = new_prediction

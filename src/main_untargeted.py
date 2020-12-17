@@ -24,8 +24,6 @@ device = torch.device("cuda" if(torch.cuda.is_available()) else "cpu")
 # import MNIST Lenet5 model trained from MNIST_model.py 
 lenet = Net()
 state = torch.load('models/mnist_lenet.pt', map_location=device)
-# lenet = Net()
-# state = torch.load("models/lenet_mnist_model.pth", map_location=device)
 lenet.load_state_dict(state) 
 lenet.eval()
 lenet.to(device)
@@ -34,12 +32,6 @@ lenet.to(device)
 transform = transforms.Compose([transforms.ToTensor(),])
 valset = datasets.MNIST('data/mnist/validation', train=False, download=True, transform=transform)
 valloader = torch.utils.data.DataLoader(valset, shuffle=True,  batch_size=1)
-
-#test mnist lenet5 model performance 
-# all_count, correct_count = lenet.evaluate(valloader, device)
-# print("Number of Images Tested=", all_count) 
-# print("Model Accuracy =", (correct_count/all_count)*100)
-
 
 # helper function for displaying an image 
 def imshow(img):
@@ -94,15 +86,15 @@ nb_episode = 100
 successful_attacks = 0
 
 # variable for the attack and specific class label
-fileName = "untargetedattacks_other/results/untargeted_attack{0}.pdf".format(nb_episode)
-modelName = 'untargetedattacks_other/models/untargeted_attack{0}.pt'.format(nb_episode)
+fileName = "test/results/untargeted_attack{0}.pdf".format(nb_episode)
+modelName = 'test/models/untargeted_attack{0}.pt'.format(nb_episode)
 
 # name of the textfile where the results will be saved
-textFileName = "untargetedattacks_other/results_untargetedattacks_{0}.txt".format(nb_episode)
+textFileName = "test/results_untargetedattacks_{0}.txt".format(nb_episode)
 
 # name for plots 
-reward_plot_name = "untargetedattacks_other/plots/cumul_reward_{0}.png".format(nb_episode)
-loss_plot_name = 'untargetedattacks_other/plots/cumul_loss_{0}.png'.format(nb_episode)
+reward_plot_name = "test/plots/cumul_reward_{0}.png".format(nb_episode)
+loss_plot_name = 'test/plots/cumul_loss_{0}.png'.format(nb_episode)
 
 # open the pdf to save the images 
 pdf = PdfPages(fileName)

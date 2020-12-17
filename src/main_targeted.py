@@ -24,8 +24,6 @@ device = torch.device("cuda" if(torch.cuda.is_available()) else "cpu")
 # import MNIST Lenet5 model trained from MNIST_model.py 
 lenet = Net()
 state = torch.load('models/mnist_lenet.pt', map_location=device)
-# lenet = Net()
-# state = torch.load("models/lenet_mnist_model.pth", map_location=device)
 lenet.load_state_dict(state) 
 lenet.eval()
 lenet.to(device)
@@ -34,12 +32,6 @@ lenet.to(device)
 transform = transforms.Compose([transforms.ToTensor(),])
 valset = datasets.MNIST('data/mnist/validation', train=False, download=True, transform=transform)
 valloader = torch.utils.data.DataLoader(valset, shuffle=True,  batch_size=1)
-
-#test mnist lenet5 model performance 
-# all_count, correct_count = lenet.evaluate(valloader, device)
-# print("Number of Images Tested=", all_count) 
-# print("Model Accuracy =", (correct_count/all_count)*100)
-
 
 # helper function for displaying an image 
 def imshow(img):
