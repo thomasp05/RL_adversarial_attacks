@@ -93,15 +93,15 @@ for i in range(10):
 
     # variable for the attack and specific class label
     target_label = i
-    fileName = "targetedattacks_other/results/targeted_attack{0}_{1}.pdf".format(nb_episode, i)
-    modelName = 'targetedattacks_other/models/targeted_attack{0}_{1}.pt'.format(nb_episode, i)
+    fileName = "targetedattacks_file/results/targeted_attack{0}_{1}.pdf".format(nb_episode, i)
+    modelName = 'targetedattacks_file/models/targeted_attack{0}_{1}.pt'.format(nb_episode, i)
     
     # name of the textfile where the results will be saved
-    textFileName = "targetedattacks_other/results_targetedattacks_{0}.txt".format(nb_episode)
+    textFileName = "targetedattacks_file/results_targetedattacks_{0}.txt".format(nb_episode)
 
     # name for plots 
-    reward_plot_name = "targetedattacks_other/plots/cumul_reward_{0}_{1}.png".format(nb_episode, i)
-    loss_plot_name = 'targetedattacks_other/plots/cumul_loss_{0}_{1}.png'.format(nb_episode, i)
+    reward_plot_name = "targetedattacks_file/plots/cumul_reward_{0}_{1}.png".format(nb_episode, i)
+    loss_plot_name = 'targetedattacks_file/plots/cumul_loss_{0}_{1}.png'.format(nb_episode, i)
 
     # open the pdf to save the images 
     pdf = PdfPages(fileName)

@@ -82,15 +82,15 @@ for i in range(10):
     # the label to be missclassified
     target_label = i
 
-    fileName = "One_NN_per_Class_Results/class_negr5_1000/results/model_for_class{0}_{1}.pdf".format(target_label, nb_episode)
-    modelName = 'One_NN_per_Class_Results/class_negr5_1000/models/model_for_class{0}_{1}.pt'.format(target_label, nb_episode)
+    fileName = "One_NN_per_Class_file/class_negr5_1000/results/model_for_class{0}_{1}.pdf".format(target_label, nb_episode)
+    modelName = 'One_NN_per_Class_file/class_negr5_1000/models/model_for_class{0}_{1}.pt'.format(target_label, nb_episode)
 
     # name of the textfile where the results will be saved
-    textFileName = "One_NN_per_Class_Results/class_negr5_1000/results_{0}.txt".format(nb_episode)
+    textFileName = "One_NN_per_Class_file/class_negr5_1000/results_{0}.txt".format(nb_episode)
 
     # name for plots 
-    reward_plot_name = "One_NN_per_Class_Results/class_negr5_1000/plots/cumul_reward_class{0}_{1}.png".format(target_label, nb_episode)
-    loss_plot_name = 'One_NN_per_Class_Results/class_negr5_1000/plots/cumul_loss_class{0}_{1}.png'.format(target_label, nb_episode)
+    reward_plot_name = "One_NN_per_Class_file/class_negr5_1000/plots/cumul_reward_class{0}_{1}.png".format(target_label, nb_episode)
+    loss_plot_name = 'One_NN_per_Class_file/class_negr5_1000/plots/cumul_loss_class{0}_{1}.png'.format(target_label, nb_episode)
 
     # open the pdf to save the images 
     pdf = PdfPages(fileName)

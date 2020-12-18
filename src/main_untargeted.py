@@ -86,15 +86,15 @@ nb_episode = 100
 successful_attacks = 0
 
 # variable for the attack and specific class label
-fileName = "test/results/untargeted_attack{0}.pdf".format(nb_episode)
-modelName = 'test/models/untargeted_attack{0}.pt'.format(nb_episode)
+fileName = "untargetedattacks_file/results/untargeted_attack{0}.pdf".format(nb_episode)
+modelName = 'untargetedattacks_file/models/untargeted_attack{0}.pt'.format(nb_episode)
 
 # name of the textfile where the results will be saved
-textFileName = "test/results_untargetedattacks_{0}.txt".format(nb_episode)
+textFileName = "untargetedattacks_file/results_untargetedattacks_{0}.txt".format(nb_episode)
 
 # name for plots 
-reward_plot_name = "test/plots/cumul_reward_{0}.png".format(nb_episode)
-loss_plot_name = 'test/plots/cumul_loss_{0}.png'.format(nb_episode)
+reward_plot_name = "untargetedattacks_file/plots/cumul_reward_{0}.png".format(nb_episode)
+loss_plot_name = 'untargetedattacks_file/plots/cumul_loss_{0}.png'.format(nb_episode)
 
 # open the pdf to save the images 
 pdf = PdfPages(fileName)
