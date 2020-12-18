@@ -11,9 +11,17 @@ Il y a trois scripts python dans le dossier **src** pour les expérimentations :
  2. main_targeted.py pour les targeted attacks
  3. main_one_NN_per_class.py pour les attaques avec un réseau par classe
 
-Ces scripts peuvent être exécutés pour reproduire nos expérimentations à condition que la fonction de reward soit configurée proprement dans le fichier *environment.py* et que le nom du dossier ou les résultats seront sauvegardé soit configuré. 
+Ces scripts peuvent être exécutés pour reproduire nos expérimentations à condition que la fonction de reward soit configurée proprement dans le fichier *environment.py* et que le nom du dossier ou les résultats seront sauvegardé soit configuré. Voici les étapes à suivre pour reproduire nos expérimentations. Ces étapes sont identique pour n'importe quel type d'attaque.
 
+1. Configurer le dossier ou les résultats seront sauvegardés. Cette étape se fait dans le script spécifique à l'attaque que l'on veut performer (un des trois scripts mentionnés plus haut). Comme on peut le voir dans la figure ci-dessous, il faut spécifier le nom du dossier (dans cet example c'est **untargetedattacks_file**). Il faut ensuite manuellement créer ce dossier dans le root directory du projet et créer les sous-dossier *results*, *plots*, et *models*. 
 ![capture_](https://user-images.githubusercontent.com/25388214/102563062-7e247780-40a6-11eb-9e64-c35dcb677593.PNG)
+
+2. Configurer la fonction de reward que l'on veut tester dans le script *environment.py*. Voici les 5 fonctions de rewards présentés dans le rapport et les lignes de code à uncomment pour chaque fonction de reward. 
+   - R1 : Ligne 138 sur la figure ci-dessous
+   - R2 : Ligne 138 et 160 sur la figure ci-dessous
+   - R3 : Ligne 141 et sur la figure ci-dessous
+   - R4 : Ligne 141 et 160 sur la figure ci-dessous
+   - R5 : Ligne 144 à 153 sur la figure ci-dessous
 
 ![rewardfunction](https://user-images.githubusercontent.com/25388214/102563238-d0659880-40a6-11eb-8d8c-23f5382f7db2.PNG)
 
